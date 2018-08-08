@@ -7,8 +7,8 @@ import cn.zeemoo.rbac.enums.ResultEnum;
 import cn.zeemoo.rbac.exception.ApiException;
 import cn.zeemoo.rbac.exception.PermissionException;
 import cn.zeemoo.rbac.exception.RbacLoginAuthException;
-import cn.zeemoo.rbac.repository.OperationLogRepository;
-import cn.zeemoo.rbac.repository.PermissionRepository;
+import cn.zeemoo.rbac.mapper.OperationLogMapper;
+import cn.zeemoo.rbac.mapper.PermissionMapper;
 import cn.zeemoo.rbac.utils.UserContext;
 import cn.zeemoo.rbac.utils.UserInfo;
 import com.alibaba.fastjson.JSON;
@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 
 import java.util.Date;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -41,13 +40,13 @@ import java.util.UUID;
 public class PermissionAspect {
 
     @Autowired
-    private PermissionRepository permissionRepository;
+    private PermissionMapper permissionMapper;
 
     @Value("${server.servlet.login-path}")
     private String login;
 
     @Autowired
-    private OperationLogRepository operationLogRepository;
+    private OperationLogMapper operationLogMapper;
 
     @Pointcut(value = "@annotation(permMark)")
     public void adminPointCut(PermMark permMark) {
@@ -81,7 +80,7 @@ public class PermissionAspect {
             operationLog.setName(permMark.value());
             //记录请求参数，方便超管追溯
             operationLog.setArgs(point.getArgs().length>0&&!point.getArgs()[0].getClass().equals(Model.class)?JSON.toJSONString(point.getArgs()[0]):"");
-            operationLogRepository.save(operationLog);
+            operationLogMapper.insert(operationLog);
         }
 
 
@@ -92,8 +91,8 @@ public class PermissionAspect {
 
         Set<String> permissions = UserContext.getPermissions();
         if (!permissions.contains(expr)) {
-            Optional<Permission> byExpr = permissionRepository.findByExpr(expr);
-            Boolean redirect = byExpr.get().getRedirectOrNot();
+            Permission byExpr = permissionMapper.selectByExpr(expr);
+            Boolean redirect = byExpr.getRedirectOrNot();
             //如果是跳转页面的权限，跑出跳转无权限页面的异常
             if (redirect) {
                 throw new PermissionException();

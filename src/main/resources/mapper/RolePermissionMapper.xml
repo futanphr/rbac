@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="cn.zeemoo.rbac.mapper.RolePermissionMapper">
+    <resultMap id="BaseResultMap" type="cn.zeemoo.rbac.domain.RolePermission">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="permission_expr" property="permissionExpr" jdbcType="VARCHAR"/>
+        <result column="role_sn" property="roleSn" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="modify_time" property="modifyTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <delete id="deleteByPrimaryKey">
+        delete from `rbac_role_permission`
+        where id = #{id,jdbcType=BIGINT}
+    </delete>
+
+    <insert id="insert">
+        insert into `rbac_role_permission` (id, permission_expr, role_sn,
+          create_time, modify_time)
+        values (#{id,jdbcType=BIGINT}, #{permissionExpr,jdbcType=VARCHAR}, #{roleSn,jdbcType=VARCHAR},
+          #{createTime,jdbcType=TIMESTAMP}, #{modifyTime,jdbcType=TIMESTAMP})
+    </insert>
+
+    <update id="updateByPrimaryKey">
+        update `rbac_role_permission`
+        set permission_expr = #{permissionExpr,jdbcType=VARCHAR},
+          role_sn = #{roleSn,jdbcType=VARCHAR},
+          create_time = #{createTime,jdbcType=TIMESTAMP},
+          modify_time = #{modifyTime,jdbcType=TIMESTAMP}
+        where id = #{id,jdbcType=BIGINT}
+    </update>
+
+    <sql id="BaseColumns">
+        id, permission_expr, role_sn, create_time, modify_time
+    </sql>
+
+    <select id="selectByPrimaryKey" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_role_permission`
+        where id = #{id,jdbcType=BIGINT}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_role_permission`
+    </select>
+
+    <select id="selectAllByRoleSnIn" resultMap="BaseResultMap" parameterType="java.util.List">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `rbac_role_permission` WHERE role_sn IN
+        <foreach collection="roleSns" item="roleSn" open="(" close=")" separator=",">
+            #{roleSn}
+        </foreach>
+    </select>
+
+    <select id="selectAllByRoleSn" resultMap="BaseResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `rbac_role_permission` WHERE role_sn=#{roleSn}
+    </select>
+
+    <delete id="deleteInBatch" parameterType="java.util.List">
+        DELETE FROM `rbac_role_permission` WHERE id IN
+        <foreach collection="rolePermissions" item="rolePermission" separator="," open="(" close=")">
+            #{rolePermission.id}
+        </foreach>
+    </delete>
+
+</mapper>

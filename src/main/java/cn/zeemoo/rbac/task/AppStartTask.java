@@ -1,14 +1,12 @@
 package cn.zeemoo.rbac.task;
 
 import cn.zeemoo.rbac.annotation.PermMark;
-import cn.zeemoo.rbac.controller.RoleController;
 import cn.zeemoo.rbac.domain.LoginInfo;
 import cn.zeemoo.rbac.domain.Permission;
-import cn.zeemoo.rbac.repository.LoginInfoRepository;
+import cn.zeemoo.rbac.mapper.LoginInfoMapper;
 import cn.zeemoo.rbac.service.IPermissionService;
 import cn.zeemoo.rbac.utils.PasswordUtils;
 import cn.zeemoo.rbac.utils.PermissionUtil;
-import com.sun.org.apache.bcel.internal.util.ClassLoader;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -16,8 +14,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.ClassUtils;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.lang.reflect.Method;
@@ -37,7 +33,7 @@ public class AppStartTask implements ApplicationContextAware, CommandLineRunner 
     private IPermissionService permissionService;
 
     @Autowired
-    private LoginInfoRepository loginInfoRepository;
+    private LoginInfoMapper loginInfoMapper;
 
     @Autowired
     private PasswordUtils passwordUtils;
@@ -50,8 +46,8 @@ public class AppStartTask implements ApplicationContextAware, CommandLineRunner 
     }
 
     private void createAdmin() {
-        Optional<LoginInfo> byIsAdminIsTrue = loginInfoRepository.findByIsAdminIsTrue();
-        if (byIsAdminIsTrue.isPresent()) {
+        LoginInfo byIsAdminIsTrue = loginInfoMapper.selectByIsAdminIsTrue();
+        if (byIsAdminIsTrue!=null) {
             return;
         }
         LoginInfo loginInfo = new LoginInfo();
@@ -65,7 +61,7 @@ public class AppStartTask implements ApplicationContextAware, CommandLineRunner 
         loginInfo.setPhone("00000000000");
         loginInfo.setRealName("超级管理员");
         loginInfo.setUsername("wordless");
-        loginInfoRepository.save(loginInfo);
+        loginInfoMapper.insert(loginInfo);
     }
 
     public void scanPermission() {

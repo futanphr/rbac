@@ -2,7 +2,6 @@ package cn.zeemoo.rbac.domain;
 
 import lombok.Data;
 
-import javax.persistence.*;
 import java.util.Date;
 
 /**
@@ -12,12 +11,8 @@ import java.util.Date;
  * @date 2018/7/9 21:06
  */
 @Data
-@Entity
-@Table(name="rbac_role")
 public class Role {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String roleName;
     private String roleSn;

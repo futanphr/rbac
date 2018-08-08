@@ -9,29 +9,24 @@ import cn.zeemoo.rbac.form.admin.role.RoleListForm;
 import cn.zeemoo.rbac.form.admin.role.RoleSaveForm;
 import cn.zeemoo.rbac.form.admin.role.permisson.RolePermissionForm;
 import cn.zeemoo.rbac.form.admin.role.permisson.RolePermissionListForm;
-import cn.zeemoo.rbac.repository.PermissionRepository;
-import cn.zeemoo.rbac.repository.RolePermissionRepository;
-import cn.zeemoo.rbac.repository.RoleRepository;
+import cn.zeemoo.rbac.mapper.PermissionMapper;
+import cn.zeemoo.rbac.mapper.RoleMapper;
+import cn.zeemoo.rbac.mapper.RolePermissionMapper;
 import cn.zeemoo.rbac.service.IRoleService;
 import cn.zeemoo.rbac.vo.ApiResult;
 import cn.zeemoo.rbac.vo.permission.PermissionVO;
 import cn.zeemoo.rbac.vo.role.RoleVO;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
-import com.alipay.api.internal.util.StringUtils;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.criteria.Predicate;
 import javax.validation.Valid;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -45,13 +40,13 @@ import java.util.stream.Collectors;
 public class RoleServiceImpl implements IRoleService {
 
     @Autowired
-    private RoleRepository roleRepository;
+    private RoleMapper roleMapper;
 
     @Autowired
-    private RolePermissionRepository rolePermissionRepository;
+    private RolePermissionMapper rolePermissionMapper;
 
     @Autowired
-    private PermissionRepository permissionRepository;
+    private PermissionMapper permissionMapper;
 
     /**
      * 查出所有的角色
@@ -60,7 +55,7 @@ public class RoleServiceImpl implements IRoleService {
      */
     @Override
     public List<Role> findAll() {
-        return roleRepository.findAll();
+        return roleMapper.selectAll();
     }
 
     /**
@@ -72,9 +67,9 @@ public class RoleServiceImpl implements IRoleService {
     @Override
     public List<PermissionVO> rolePermissions(@Valid RolePermissionListForm form) {
 
-        List<RolePermission> allByRoleSn = rolePermissionRepository.findAllByRoleSn(form.getRoleSn());
+        List<RolePermission> allByRoleSn = rolePermissionMapper.selectAllByRoleSn(form.getRoleSn());
         Set<String> rolePermissions = allByRoleSn.stream().map(rolePermission -> rolePermission.getPermissionExpr()).collect(Collectors.toSet());
-        final List<Permission> all = permissionRepository.findAll();
+        final List<Permission> all = permissionMapper.selectAll();
         return all.stream().map(permission -> {
             PermissionVO permissionVO = new PermissionVO();
             BeanUtils.copyProperties(permission,permissionVO);
@@ -95,11 +90,12 @@ public class RoleServiceImpl implements IRoleService {
         });
         //查出该角色所拥有的所有权限
         String roleSn = form.getRoleSn();
-        List<RolePermission> rolePermissions = rolePermissionRepository.findAllByRoleSn(roleSn);
-        rolePermissionRepository.deleteInBatch(rolePermissions);
-
+        List<RolePermission> rolePermissions = rolePermissionMapper.selectAllByRoleSn(roleSn);
+        if(!rolePermissions.isEmpty()){
+            rolePermissionMapper.deleteInBatch(rolePermissions);
+        }
         List<RolePermission> collect = exprs.stream().map(s -> new RolePermission(roleSn, s)).collect(Collectors.toList());
-        rolePermissionRepository.saveAll(collect);
+        rolePermissionMapper.insertAll(collect);
 
     }
 
@@ -110,7 +106,7 @@ public class RoleServiceImpl implements IRoleService {
      */
     @Override
     public void delete(Long id) {
-        roleRepository.deleteById(id);
+        roleMapper.deleteByPrimaryKey(id);
         //todo 删除对应权限关联和角色关联
     }
 
@@ -122,26 +118,14 @@ public class RoleServiceImpl implements IRoleService {
      */
     @Override
     public ApiResult<List<RoleVO>> list(@Valid RoleListForm form) {
-        Pageable request = PageRequest.of(
-                form.getCurrentPage(),
-                form.getLimit(),
-                Sort.Direction.DESC,
-                "modifyTime", "createTime");
-        Page<Role> all = roleRepository.findAll((root, criteriaQuery, criteriaBuilder) -> {
-            if (StringUtils.areNotEmpty(form.getKeyword())) {
-                String keyword = "%" + form.getKeyword() + "%";
-                Predicate roleName = criteriaBuilder.like(root.get("roleName").as(String.class), keyword);
-                Predicate roleSn = criteriaBuilder.like(root.get("roleSn").as(String.class), keyword);
-                return criteriaBuilder.or(roleName, roleSn);
-            }
-            return null;
-        }, request);
-        List<RoleVO> collect = all.getContent().stream().map(role -> {
+        PageHelper.startPage(form.getPage(),form.getLimit(),true);
+        Page<Role> all = (Page<Role>) roleMapper.selectAllByRoleNameLikeOrRoleSnLike(form.getKeyword());
+        List<RoleVO> collect = all.getResult().stream().map(role -> {
             RoleVO vo = new RoleVO();
             BeanUtils.copyProperties(role, vo);
             return vo;
         }).collect(Collectors.toList());
-        return new ApiResult<>().success(collect, all.getTotalElements());
+        return new ApiResult<>().success(collect, all.getTotal());
     }
 
     @Override
@@ -150,42 +134,42 @@ public class RoleServiceImpl implements IRoleService {
         String roleName = form.getRoleName();
         String roleSn = form.getRoleSn();
         if (form.getId() == null) {
-
-            Optional<Role> byRoleName = roleRepository.findByRoleName(roleName);
-            if (byRoleName.isPresent()) {
+            role = roleMapper.selectByRoleName(roleName);
+            if (role!=null) {
                 throw new ApiException(ResultEnum.ROLE_NAME_EXIST);
             }
-            Optional<Role> byRoleSn = roleRepository.findByRoleSn(roleSn);
-            if (byRoleSn.isPresent()) {
+            Role byRoleSn = roleMapper.selectByRoleSn(roleSn);
+            if (byRoleSn!=null) {
                 throw new ApiException(ResultEnum.ROLE_SN_EXIST);
             }
             role = new Role();
             BeanUtils.copyProperties(form, role);
             role.setCreateTime(new Date());
             role.setModifyTime(new Date());
+            roleMapper.insert(role);
         } else {
-            Optional<Role> byId = roleRepository.findById(form.getId());
-            if (!byId.isPresent()) {
+            Role byId = roleMapper.selectByPrimaryKey(form.getId());
+            if (byId==null) {
                 throw new ApiException(ResultEnum.ROLE_NOT_EXIST);
             }
 
-            Optional<Role> byRoleName = roleRepository.findByRoleName(roleName);
-            if (byRoleName.isPresent() && !byRoleName.get().getId().equals(byId.get().getId())) {
+            Role byRoleName = roleMapper.selectByRoleName(roleName);
+            if (byRoleName!=null && !byRoleName.getId().equals(byId.getId())) {
                 throw new ApiException(ResultEnum.ROLE_NAME_EXIST);
             }
 
-            Optional<Role> byRoleSn = roleRepository.findByRoleSn(roleSn);
-            if (byRoleSn.isPresent() && !byRoleSn.get().getId().equals(byId.get().getId())) {
+            Role byRoleSn = roleMapper.selectByRoleSn(roleSn);
+            if (byRoleSn!=null && !byRoleSn.getId().equals(byId.getId())) {
                 throw new ApiException(ResultEnum.ROLE_SN_EXIST);
             }
 
-            role = byId.get();
+            role = byId;
             BeanUtils.copyProperties(form, role);
             role.setModifyTime(new Date());
+            roleMapper.updateByPrimaryKey(role);
         }
-        Role save = roleRepository.save(role);
         RoleVO vo = new RoleVO();
-        BeanUtils.copyProperties(save, vo);
+        BeanUtils.copyProperties(role, vo);
         return vo;
     }
 }

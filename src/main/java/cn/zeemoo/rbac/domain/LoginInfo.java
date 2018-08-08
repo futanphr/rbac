@@ -2,26 +2,21 @@ package cn.zeemoo.rbac.domain;
 
 import lombok.Data;
 
-import javax.persistence.*;
 import java.util.Date;
 
 /**
  * 登录信息类
  *
  * @author zeemoo
- * @date 2018/7/4 21:57
+ * @date 2018/8/6 21:57
  */
 @Data
-@Entity
-@Table(name = "rbac_login_info")
 public class LoginInfo {
     public static Boolean BAN = false;
     public static Boolean FREE = true;
     /**
      * id
      */
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     /**
      * 用户名

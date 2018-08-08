@@ -2,22 +2,16 @@ package cn.zeemoo.rbac.service.impl;
 
 import cn.zeemoo.rbac.domain.Permission;
 import cn.zeemoo.rbac.form.admin.permission.PermissionListForm;
-import cn.zeemoo.rbac.repository.PermissionRepository;
+import cn.zeemoo.rbac.mapper.PermissionMapper;
 import cn.zeemoo.rbac.service.IPermissionService;
 import cn.zeemoo.rbac.vo.ApiResult;
 import cn.zeemoo.rbac.vo.permission.PermissionVO;
-import com.alipay.api.internal.util.StringUtils;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,7 +25,7 @@ import java.util.stream.Collectors;
 public class PermissionServiceImpl implements IPermissionService {
 
     @Autowired
-    private PermissionRepository repository;
+    private PermissionMapper permissionMapper;
 
     /**
      * 查询权限列表
@@ -41,19 +35,14 @@ public class PermissionServiceImpl implements IPermissionService {
      */
     @Override
     public ApiResult<List<PermissionVO>> list(PermissionListForm form) {
-        Pageable request = PageRequest.of(form.getCurrentPage(),form.getLimit(), Sort.Direction.ASC,"expr","name");
-        Page<Permission> all = repository.findAll((Root<Permission> root, CriteriaQuery<?> criteriaQuery, CriteriaBuilder criteriaBuilder) -> {
-            if (StringUtils.areNotEmpty(form.getKeyword())) {
-                return criteriaBuilder.like(root.get("name").as(String.class), "%" + form.getKeyword() + "%");
-            }
-            return null;
-        }, request);
-        List<PermissionVO> collect = all.getContent().stream().map(permission -> {
+        PageHelper.startPage(form.getPage(),form.getLimit(),true);
+        Page<Permission> all = (Page<Permission>) permissionMapper.selectAllByName(form.getKeyword());
+        List<PermissionVO> collect = all.getResult().stream().map(permission -> {
             PermissionVO vo = new PermissionVO();
             BeanUtils.copyProperties(permission, vo);
             return vo;
         }).collect(Collectors.toList());
-        return new ApiResult<>().success(collect,all.getTotalElements());
+        return new ApiResult<>().success(collect,all.getTotal());
     }
 
     /**
@@ -63,7 +52,7 @@ public class PermissionServiceImpl implements IPermissionService {
      */
     @Override
     public List<String> findAllExpr() {
-        return repository.findAll().stream()
+        return permissionMapper.selectAll().stream()
                 .map(permission -> permission.getExpr())
                 .collect(Collectors.toList());
     }
@@ -79,6 +68,8 @@ public class PermissionServiceImpl implements IPermissionService {
         List<Permission> collect = permissions.stream()
                 .filter(permission -> !allExpr.contains(permission.getExpr()))
                 .collect(Collectors.toList());
-        repository.saveAll(collect);
+        if(!collect.isEmpty()){
+            permissionMapper.insertAll(collect);
+        }
     }
 }

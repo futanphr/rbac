@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="cn.zeemoo.rbac.mapper.PermissionMapper">
+    <resultMap id="BaseResultMap" type="cn.zeemoo.rbac.domain.Permission">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="expr" property="expr" jdbcType="VARCHAR"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="redirect_or_not" property="redirectOrNot" jdbcType="BIT"/>
+    </resultMap>
+
+    <delete id="deleteByPrimaryKey">
+        delete from `rbac_permission`
+        where id = #{id,jdbcType=BIGINT}
+    </delete>
+
+    <insert id="insert">
+        insert into `rbac_permission` (id, expr, name,
+          redirect_or_not)
+        values (#{id,jdbcType=BIGINT}, #{expr,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR},
+          #{redirectOrNot,jdbcType=BIT})
+    </insert>
+
+    <update id="updateByPrimaryKey">
+        update `rbac_permission`
+        set expr = #{expr,jdbcType=VARCHAR},
+          name = #{name,jdbcType=VARCHAR},
+          redirect_or_not = #{redirectOrNot,jdbcType=BIT}
+        where id = #{id,jdbcType=BIGINT}
+    </update>
+
+    <sql id="BaseColumns">
+        id, expr, `name`, redirect_or_not
+    </sql>
+
+    <select id="selectByPrimaryKey" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_permission`
+        where id = #{id,jdbcType=BIGINT}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_permission`
+    </select>
+
+    <select id="selectAllByName" resultMap="BaseResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `rbac_permission`
+        <where>
+            <if test="keyword!=null and keyword!=''">
+                AND `name` LIKE CONCAT('%',#{keyword},'%')
+            </if>
+        </where>
+        ORDER BY `name`,expr
+    </select>
+
+    <insert id="insertAll" parameterType="java.util.List">
+        INSERT INTO `rbac_permission`(id, expr, `name`, redirect_or_not) VALUES
+        <foreach collection="permissions" separator="," item="permission">
+            (#{permission.id},#{permission.expr},#{permission.name},#{permission.redirectOrNot})
+        </foreach>
+    </insert>
+
+    <select id="selectByExpr" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM `rbac_permission`
+        where expr=#{expr}
+    </select>
+</mapper>

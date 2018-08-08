@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="cn.zeemoo.rbac.mapper.RoleMapper">
+    <resultMap id="BaseResultMap" type="cn.zeemoo.rbac.domain.Role">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="modify_time" property="modifyTime" jdbcType="TIMESTAMP"/>
+        <result column="role_name" property="roleName" jdbcType="VARCHAR"/>
+        <result column="role_sn" property="roleSn" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <delete id="deleteByPrimaryKey">
+        delete from `rbac_role`
+        where id = #{id,jdbcType=BIGINT}
+    </delete>
+
+    <insert id="insert">
+        insert into `rbac_role` (id, create_time, modify_time,
+          role_name, role_sn)
+        values (#{id,jdbcType=BIGINT}, #{createTime,jdbcType=TIMESTAMP}, #{modifyTime,jdbcType=TIMESTAMP},
+          #{roleName,jdbcType=VARCHAR}, #{roleSn,jdbcType=VARCHAR})
+    </insert>
+
+    <update id="updateByPrimaryKey">
+        update `rbac_role`
+        set create_time = #{createTime,jdbcType=TIMESTAMP},
+          modify_time = #{modifyTime,jdbcType=TIMESTAMP},
+          role_name = #{roleName,jdbcType=VARCHAR},
+          role_sn = #{roleSn,jdbcType=VARCHAR}
+        where id = #{id,jdbcType=BIGINT}
+    </update>
+
+    <sql id="BaseColumns">
+        id, create_time, modify_time, role_name, role_sn
+    </sql>
+
+    <select id="selectByPrimaryKey" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_role`
+        where id = #{id,jdbcType=BIGINT}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_role`
+    </select>
+
+    <select id="selectAllByRoleNameLikeOrRoleSnLike" resultMap="BaseResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM `rbac_role`
+        <where>
+            <if test="roleSn != null and roleSn != ''">
+                OR role_sn LIKE CONCAT('%',#{roleSn},'%')
+            </if>
+            <if test="roleName != null and roleName != ''">
+                OR role_name LIKE CONCAT('%',#{roleName},'%')
+            </if>
+        </where>
+        ORDER BY role_name,modify_time DESC ,create_time DESC
+    </select>
+
+    <select id="selectByRoleName" resultMap="BaseResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        from `rbac_role`
+        where role_name = #{roleName}
+    </select>
+
+    <select id="selectByRoleSn" resultMap="BaseResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        from `rbac_role`
+        where role_sn = #{roleSn}
+    </select>
+</mapper>

@@ -77,7 +77,7 @@
                 , offset: 'rb'
                 , icon: 3
                 , area: ["320px", "200px"]
-                , content: "<h3>上次登录时间为<p>${(userInfo.lastLoginTime)!}</p></h3>"
+                , content: "<h3>上次登录时间为<p>${(userInfo.lastLoginTime)?string('y-MM-dd HH:mm:ss')}</p></h3>"
                 , end: function () {
                     $.post("${baseUrl}/login/msg/read");
                 }

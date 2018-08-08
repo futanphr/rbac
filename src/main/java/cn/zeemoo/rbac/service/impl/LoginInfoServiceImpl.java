@@ -6,39 +6,35 @@ import cn.zeemoo.rbac.domain.Role;
 import cn.zeemoo.rbac.domain.RolePermission;
 import cn.zeemoo.rbac.enums.ResultEnum;
 import cn.zeemoo.rbac.exception.ApiException;
+import cn.zeemoo.rbac.form.admin.role.UserRoleForm;
 import cn.zeemoo.rbac.form.admin.role.UserRoleListForm;
 import cn.zeemoo.rbac.form.admin.user.ResetPasswordForm;
 import cn.zeemoo.rbac.form.admin.user.UpdateUserInfoForm;
 import cn.zeemoo.rbac.form.admin.user.UserInfoSaveForm;
 import cn.zeemoo.rbac.form.admin.user.UserListForm;
-import cn.zeemoo.rbac.repository.LoginInfoRepository;
-import cn.zeemoo.rbac.repository.LoginInfoRoleRepository;
-import cn.zeemoo.rbac.repository.RolePermissionRepository;
+import cn.zeemoo.rbac.mapper.LoginInfoMapper;
+import cn.zeemoo.rbac.mapper.LoginInfoRoleMapper;
+import cn.zeemoo.rbac.mapper.RolePermissionMapper;
 import cn.zeemoo.rbac.service.ILoginInfoService;
 import cn.zeemoo.rbac.service.IRoleService;
 import cn.zeemoo.rbac.utils.PasswordUtils;
 import cn.zeemoo.rbac.utils.UserContext;
 import cn.zeemoo.rbac.vo.ApiResult;
 import cn.zeemoo.rbac.vo.user.UserInfoVO;
-import cn.zeemoo.rbac.form.admin.role.UserRoleForm;
 import cn.zeemoo.rbac.vo.user.role.UserRolesVO;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.TypeReference;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.Predicate;
 import javax.validation.Valid;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,19 +48,37 @@ import java.util.stream.Collectors;
 public class LoginInfoServiceImpl implements ILoginInfoService {
 
     @Autowired
-    private LoginInfoRepository repository;
+    private LoginInfoMapper loginInfoMapper;
 
     @Autowired
     private PasswordUtils passwordUtils;
 
     @Autowired
-    private LoginInfoRoleRepository loginInfoRoleRepository;
+    private LoginInfoRoleMapper loginInfoRoleMapper;
 
     @Autowired
-    private RolePermissionRepository rolePermissionRepository;
+    private RolePermissionMapper rolePermissionMapper;
 
     @Autowired
     private IRoleService roleService;
+
+    /**
+     * 保存或修改
+     *
+     * @param loginInfo
+     * @return
+     */
+    @Override
+    public int save(LoginInfo loginInfo) {
+        if (loginInfo.getId() == null) {
+            loginInfo.setCreateTime(new Date());
+            loginInfo.setModifyTime(new Date());
+            return loginInfoMapper.insert(loginInfo);
+        } else {
+            loginInfo.setModifyTime(new Date());
+            return loginInfoMapper.updateByPrimaryKey(loginInfo);
+        }
+    }
 
     /**
      * 修改密码
@@ -74,8 +88,10 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
     @Override
     public void resetPassword(@Valid ResetPasswordForm form) {
         Long id = UserContext.getUserInfo().getId();
-        Optional<LoginInfo> byId = repository.findById(id);
-        LoginInfo loginInfo = byId.get();
+        LoginInfo loginInfo = loginInfoMapper.selectByPrimaryKey(id);
+        if (loginInfo == null) {
+            throw new ApiException(ResultEnum.USER_NOT_EXIST);
+        }
         if (!passwordUtils.isContainLetterAndNumAndSymbols(form.getNewPassword())) {
             throw new ApiException(ResultEnum.PASSWORD_TOO_WEEK);
         }
@@ -83,7 +99,7 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
             throw new ApiException(ResultEnum.USER_NOT_EXIST.PASSWORD_ERR);
         }
         loginInfo.setPassword(passwordUtils.encode(form.getNewPassword()));
-        repository.save(loginInfo);
+        this.save(loginInfo);
     }
 
     /**
@@ -93,16 +109,15 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
      */
     @Override
     public void updateUserInfo(@Valid UpdateUserInfoForm form) {
-        Optional<LoginInfo> byId = repository.findById(UserContext.getUserInfo().getId());
-        LoginInfo loginInfo = byId.get();
+        LoginInfo loginInfo = loginInfoMapper.selectByPrimaryKey(UserContext.getUserInfo().getId());
         loginInfo.setPhone(form.getPhone());
-        repository.save(loginInfo);
+        this.save(loginInfo);
         UserContext.setUserInfo(loginInfo);
     }
 
     @Override
     public List<UserRolesVO> userRoles(@Valid UserRoleListForm form) {
-        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleRepository.findAllByLoginInfoId(form.getUserId());
+        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleMapper.selectAllByLoginInfoId(form.getUserId());
         Set<String> userRoles = allByLoginInfoId.stream().map(loginInfoRole -> loginInfoRole.getRoleSn()).collect(Collectors.toSet());
         List<Role> roles = roleService.findAll();
         List<UserRolesVO> collect = roles.stream().map(role -> {
@@ -125,10 +140,12 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
         String json = form.getRoleSns();
         Set<String> roleSns = JSON.parseObject(json, new TypeReference<Set<String>>() {
         });
-        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleRepository.findAllByLoginInfoId(userId);
-        loginInfoRoleRepository.deleteInBatch(allByLoginInfoId);
+        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleMapper.selectAllByLoginInfoId(form.getUserId());
+        if(allByLoginInfoId.size()>0){
+            loginInfoRoleMapper.deleteInBatch(allByLoginInfoId);
+        }
         List<LoginInfoRole> collect = roleSns.stream().map(s -> new LoginInfoRole(userId, s)).collect(Collectors.toList());
-        loginInfoRoleRepository.saveAll(collect);
+        loginInfoRoleMapper.insertAll(collect);
 
     }
 
@@ -139,14 +156,13 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
      */
     @Override
     public void addErrTimes(String username) {
-        Optional<LoginInfo> byUsername = repository.findByUsername(username);
-        if (byUsername.isPresent()) {
-            LoginInfo loginInfo = byUsername.get();
-            if(loginInfo.getErrorTimes()>3){
+        LoginInfo loginInfo = loginInfoMapper.selectByUsername(username);
+        if (loginInfo != null) {
+            if (loginInfo.getErrorTimes() > 3) {
                 loginInfo.setIsBanned(LoginInfo.BAN);
             }
             loginInfo.setErrorTimes(loginInfo.getErrorTimes() + 1);
-            repository.save(loginInfo);
+            loginInfoMapper.updateByPrimaryKey(loginInfo);
         }
     }
 
@@ -159,12 +175,11 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
     @Override
     @Transactional(rollbackFor = RuntimeException.class)
     public void login(String username, String password) {
-        Optional<LoginInfo> byUsernameAndPassword = repository.findByUsername(username);
+        LoginInfo loginInfo = loginInfoMapper.selectByUsername(username);
         //用户名用户是否存在
-        if (!byUsernameAndPassword.isPresent()) {
+        if (loginInfo == null) {
             throw new ApiException(ResultEnum.LOGIN_ERR);
         }
-        LoginInfo loginInfo = byUsernameAndPassword.get();
         //是否被禁用
         if (loginInfo.getIsBanned().equals(LoginInfo.BAN)) {
             throw new ApiException(ResultEnum.USER_IS_BANNED);
@@ -179,23 +194,18 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
         //更新登录用户的数据库信息
         loginInfo.setLastLoginTime(new Date());
         loginInfo.setErrorTimes(0);
-        repository.save(loginInfo);
+        this.save(loginInfo);
 
         //查询所有的角色，找出权限去重合集，保存到session
-        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleRepository.findAllByLoginInfoId(loginInfo.getId());
+        List<LoginInfoRole> allByLoginInfoId = loginInfoRoleMapper.selectAllByLoginInfoId(loginInfo.getId());
         List<String> collect = allByLoginInfoId.stream().map(loginInfoRole -> loginInfoRole.getRoleSn()).collect(Collectors.toList());
-        List<RolePermission> rolePermissions = rolePermissionRepository.findAll((root, query, criteriaBuilder) -> {
-            if (!collect.isEmpty()) {
-                CriteriaBuilder.In<String> roleSn = criteriaBuilder.in(root.get("roleSn").as(String.class));
-                collect.forEach(s->{
-                    roleSn.value(s);
-                });
-                return roleSn;
-            }
-            return null;
-        });
-        Set<String> permissionExprs = rolePermissions.stream().map(rolePermission -> rolePermission.getPermissionExpr()).collect(Collectors.toSet());
-        UserContext.setPermissions(permissionExprs);
+        if(!collect.isEmpty()){
+            List<RolePermission> rolePermissions = rolePermissionMapper.selectAllByRoleSnIn(collect);
+            Set<String> permissionExprs = rolePermissions.stream().map(rolePermission -> rolePermission.getPermissionExpr()).collect(Collectors.toSet());
+            UserContext.setPermissions(permissionExprs);
+        }else {
+            UserContext.setPermissions(Collections.EMPTY_SET);
+        }
     }
 
     /**
@@ -206,8 +216,8 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
      */
     @Override
     public void setPassword(Long id, String password) {
-        Optional<LoginInfo> byId = repository.findById(id);
-        if (!byId.isPresent()) {
+        LoginInfo loginInfo = loginInfoMapper.selectByPrimaryKey(id);
+        if (loginInfo == null) {
             throw new ApiException(ResultEnum.USER_NOT_EXIST);
         }
         if (password == null || password.length() < 6 || password.length() > 16) {
@@ -216,9 +226,8 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
         if (!passwordUtils.isContainLetterAndNumAndSymbols(password)) {
             throw new ApiException(ResultEnum.PASSWORD_TOO_WEEK);
         }
-        LoginInfo loginInfo = byId.get();
         loginInfo.setPassword(passwordUtils.encode(password));
-        repository.save(loginInfo);
+        this.save(loginInfo);
     }
 
     /**
@@ -231,14 +240,13 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
         if (id == null) {
             throw new ApiException(ResultEnum.USER_NOT_EXIST);
         }
-        Optional<LoginInfo> byId = repository.findById(id);
-        if (byId.isPresent()) {
-            LoginInfo loginInfo = byId.get();
+        LoginInfo loginInfo = loginInfoMapper.selectByPrimaryKey(id);
+        if (loginInfo != null) {
             if (loginInfo.getIsAdmin()) {
                 throw new ApiException(ResultEnum.AMINISTRATOR_ERR);
             }
         }
-        repository.deleteById(id);
+        loginInfoMapper.deleteByPrimaryKey(id);
         //todo 删除用户相关的数据
     }
 
@@ -250,18 +258,17 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
      */
     @Override
     public boolean ban(Long id) {
-        Optional<LoginInfo> byId = repository.findById(id);
-        if (!byId.isPresent()) {
+        LoginInfo loginInfo = loginInfoMapper.selectByPrimaryKey(id);
+        if (loginInfo != null) {
             throw new ApiException(ResultEnum.USER_NOT_EXIST);
         }
-        LoginInfo loginInfo = byId.get();
         if (loginInfo.getIsAdmin()) {
             throw new ApiException(ResultEnum.AMINISTRATOR_ERR);
         }
         Boolean isBaned = !loginInfo.getIsBanned();
         loginInfo.setIsBanned(isBaned);
         loginInfo.setModifyTime(new Date());
-        repository.save(loginInfo);
+        this.save(loginInfo);
         return isBaned;
     }
 
@@ -276,8 +283,8 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
         LoginInfo loginInfo = null;
         if (form.getId() == null) {
             String username = form.getUsername();
-            Optional<LoginInfo> byUsername = repository.findByUsername(username);
-            if (byUsername.isPresent()) {
+            loginInfo = loginInfoMapper.selectByUsername(username);
+            if (loginInfo == null) {
                 throw new ApiException(ResultEnum.USERNAME_ALREADY_BIND);
             }
             loginInfo = new LoginInfo();
@@ -287,16 +294,15 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
             loginInfo.setIsBanned(form.getIsBanned());
             loginInfo.setIsAdmin(false);
         } else {
-            Optional<LoginInfo> byId = repository.findById(form.getId());
-            if (!byId.isPresent()) {
+            loginInfo = loginInfoMapper.selectByPrimaryKey(form.getId());
+            if (loginInfo != null) {
                 throw new ApiException(ResultEnum.USER_NOT_EXIST);
             }
-            loginInfo = byId.get();
             BeanUtils.copyProperties(form, loginInfo);
             loginInfo.setModifyTime(new Date());
             loginInfo.setIsBanned(form.getIsBanned());
         }
-        repository.save(loginInfo);
+        this.save(loginInfo);
         UserInfoVO vo = new UserInfoVO();
         BeanUtils.copyProperties(loginInfo, vo);
         return vo;
@@ -310,20 +316,13 @@ public class LoginInfoServiceImpl implements ILoginInfoService {
      */
     @Override
     public ApiResult<List<UserInfoVO>> list(UserListForm form) {
-        PageRequest request = PageRequest.of(form.getCurrentPage(), form.getLimit(), Sort.Direction.DESC, "modifyTime", "createTime");
-        Page<LoginInfo> all = repository.findAll((root, criteriaQuery, criteriaBuilder) -> {
-            Predicate isAdmin = criteriaBuilder.isFalse(root.get("isAdmin").as(Boolean.class));
-            if (!StringUtils.isEmpty(form.getUsername())) {
-                Predicate username = criteriaBuilder.like(root.get("username").as(String.class), "%".concat(form.getUsername()).concat("%"));
-                isAdmin = criteriaBuilder.and(username, isAdmin);
-            }
-            return isAdmin;
-        }, request);
-        List<UserInfoVO> collect = all.getContent().stream().map(loginInfo -> {
+        PageHelper.startPage(form.getPage(),form.getLimit(),true);
+        Page<LoginInfo> all = (Page<LoginInfo>) loginInfoMapper.selectAllByUsernameLikeAndIsAdminIsFalse(form.getUsername());
+        List<UserInfoVO> collect = all.getResult().stream().map(loginInfo -> {
             UserInfoVO vo = new UserInfoVO();
             BeanUtils.copyProperties(loginInfo, vo);
             return vo;
         }).collect(Collectors.toList());
-        return new ApiResult<>().success(collect, all.getTotalElements());
+        return new ApiResult<>().success(collect, all.getTotal());
     }
 }

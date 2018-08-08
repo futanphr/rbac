@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="cn.zeemoo.rbac.mapper.OperationLogMapper">
+    <resultMap id="BaseResultMap" type="cn.zeemoo.rbac.domain.OperationLog">
+        <id column="id" property="id" jdbcType="VARCHAR"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="expr" property="expr" jdbcType="VARCHAR"/>
+        <result column="modify_time" property="modifyTime" jdbcType="TIMESTAMP"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="args" property="args" jdbcType="LONGVARCHAR"/>
+    </resultMap>
+
+    <delete id="deleteByPrimaryKey">
+        delete from `rbac_operation_log`
+        where id = #{id,jdbcType=VARCHAR}
+    </delete>
+
+    <insert id="insert">
+        insert into `rbac_operation_log` (id, create_time, expr,
+          modify_time, name, user_id,
+          args)
+        values (#{id,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{expr,jdbcType=VARCHAR},
+          #{modifyTime,jdbcType=TIMESTAMP}, #{name,jdbcType=VARCHAR}, #{userId,jdbcType=BIGINT},
+          #{args,jdbcType=LONGVARCHAR})
+    </insert>
+
+    <update id="updateByPrimaryKey">
+        update `rbac_operation_log`
+        set create_time = #{createTime,jdbcType=TIMESTAMP},
+          expr = #{expr,jdbcType=VARCHAR},
+          modify_time = #{modifyTime,jdbcType=TIMESTAMP},
+          name = #{name,jdbcType=VARCHAR},
+          user_id = #{userId,jdbcType=BIGINT},
+          args = #{args,jdbcType=LONGVARCHAR}
+        where id = #{id,jdbcType=VARCHAR}
+    </update>
+
+    <sql id="BaseColumns">
+        id, create_time, expr, modify_time, name, user_id, args
+    </sql>
+
+    <select id="selectByPrimaryKey" resultMap="BaseResultMap">
+        select
+        <include refid="BaseColumns"/>
+        from `rbac_operation_log`
+        where id = #{id,jdbcType=VARCHAR}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        select <include refid="BaseColumns"/>
+        from `rbac_operation_log`
+    </select>
+
+    <select id="selectAllByUserId" resultMap="BaseResultMap">
+        SELECT <include refid="BaseColumns"/>
+        FROM `rbac_operation_log`
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+</mapper>

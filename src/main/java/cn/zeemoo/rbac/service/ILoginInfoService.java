@@ -1,13 +1,14 @@
 package cn.zeemoo.rbac.service;
 
+import cn.zeemoo.rbac.domain.LoginInfo;
+import cn.zeemoo.rbac.form.admin.role.UserRoleForm;
 import cn.zeemoo.rbac.form.admin.role.UserRoleListForm;
 import cn.zeemoo.rbac.form.admin.user.ResetPasswordForm;
 import cn.zeemoo.rbac.form.admin.user.UpdateUserInfoForm;
 import cn.zeemoo.rbac.form.admin.user.UserInfoSaveForm;
-import cn.zeemoo.rbac.vo.user.UserInfoVO;
 import cn.zeemoo.rbac.form.admin.user.UserListForm;
 import cn.zeemoo.rbac.vo.ApiResult;
-import cn.zeemoo.rbac.form.admin.role.UserRoleForm;
+import cn.zeemoo.rbac.vo.user.UserInfoVO;
 import cn.zeemoo.rbac.vo.user.role.UserRolesVO;
 
 import javax.validation.Valid;
@@ -22,7 +23,7 @@ import java.util.List;
 public interface ILoginInfoService {
 
     /**
-     * 新增或编辑
+     * 新增或编辑的数据操作
      *
      * @param form
      * @return
@@ -102,4 +103,11 @@ public interface ILoginInfoService {
      * @param form
      */
     void resetPassword(@Valid ResetPasswordForm form);
+
+    /**
+     * 保存或修改
+     * @param loginInfo
+     * @return
+     */
+    int save(LoginInfo loginInfo);
 }
